@@ -58,6 +58,7 @@ private:
 	bool cmdSelector(int argc, const char **argv);
 	bool cmdSelectors(int argc, const char **argv);
 	bool cmdKernelFunctions(int argc, const char **argv);
+	bool cmdKernCall(int argc, const char **argv);
 	bool cmdClassTable(int argc, const char **argv);
 	// Parser
 	bool cmdSuffixes(int argc, const char **argv);
@@ -176,6 +177,7 @@ private:
 	bool cmdViewObject(int argc, const char **argv);
 	bool cmdViewActiveObject(int argc, const char **argv);
 	bool cmdViewAccumulatorObject(int argc, const char **argv);
+	bool cmdXs(int argc, const char **argv);
 	// Variables
 	bool cmdSpeedThrottle(int argc, const char **argv);
 

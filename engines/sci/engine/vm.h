@@ -346,6 +346,8 @@ ExecStack *execute_method(EngineState *s, uint16 script, uint16 pubfunct,
 		StackPtr sp, reg_t calling_obj, uint16 argc, StackPtr argp);
 
 
+void callKernelFunc(EngineState *s, int kernelCallNr, int argc);
+
 /**
  * Executes a "send" or related operation to a selector.
  * @param[in] s			The EngineState to operate on

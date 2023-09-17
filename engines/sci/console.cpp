@@ -63,6 +63,7 @@
 
 #include "common/file.h"
 #include "common/savefile.h"
+#include "common/stack.h"
 
 #include "engines/util.h"
 
@@ -100,7 +101,8 @@ Console::Console(SciEngine *engine) : GUI::Debugger(),
 	registerCmd("opcodes",			WRAP_METHOD(Console, cmdOpcodes));
 	registerCmd("selector",			WRAP_METHOD(Console, cmdSelector));
 	registerCmd("selectors",			WRAP_METHOD(Console, cmdSelectors));
-	registerCmd("functions",			WRAP_METHOD(Console, cmdKernelFunctions));
+	registerCmd("kernfunctions",		WRAP_METHOD(Console, cmdKernelFunctions));
+	registerCmd("kerncall", 		WRAP_METHOD(Console, cmdKernCall));
 	registerCmd("class_table",		WRAP_METHOD(Console, cmdClassTable));
 	// Parser
 	registerCmd("suffixes",			WRAP_METHOD(Console, cmdSuffixes));
@@ -260,6 +262,7 @@ Console::Console(SciEngine *engine) : GUI::Debugger(),
 	registerCmd("vo",					WRAP_METHOD(Console, cmdViewObject));				// alias
 	registerCmd("active_object",		WRAP_METHOD(Console, cmdViewActiveObject));
 	registerCmd("acc_object",			WRAP_METHOD(Console, cmdViewAccumulatorObject));
+	registerCmd("xs",					WRAP_METHOD(Console, cmdXs));
 
 	_debugState.seeking = kDebugSeekNothing;
 	_debugState.seekLevel = 0;
@@ -620,26 +623,118 @@ bool Console::cmdSelectors(int argc, const char **argv) {
 
 bool Console::cmdKernelFunctions(int argc, const char **argv) {
 	debugPrintf("Kernel function names in numeric order:\n");
+	debugPrintf("+ denotes Kernel functions with subcommands\n");
 	uint column = 0;
 	for (uint seeker = 0; seeker <  _engine->getKernel()->getKernelNamesSize(); seeker++) {
 		const Common::String &kernelName = _engine->getKernel()->getKernelName(seeker);
 		if (kernelName == "Dummy")
 			continue;
 
+		const KernelFunction &kernelCall = _engine->getKernel()->_kernelFuncs[seeker];
+		const char *subCmdNote = kernelCall.subFunctionCount ? "+" : "";
+		
 		if (argc == 1) {
-			debugPrintf("%03x: %20s | ", seeker, kernelName.c_str());
+			debugPrintf("%03x: %20s | ", seeker, (kernelName + subCmdNote).c_str());
 			if ((column++ % 3) == 2)
 				debugPrintf("\n");
 		} else {
 			for (int i = 1; i < argc; ++i) {
 				if (kernelName.equalsIgnoreCase(argv[i])) {
-					debugPrintf("%03x: %s\n", seeker, kernelName.c_str());
+					debugPrintf("%03x: %s\n", seeker, subCmdNote, (kernelName + subCmdNote).c_str());
 				}
 			}
 		}
 	}
 
 	debugPrintf("\n");
+
+	return true;
+}
+
+bool Console::cmdXs(int argc, const char **argv) {
+	EngineState *s = _engine->_gamestate;
+
+	Common::List<ExecStack>::const_iterator it;
+	const Common::List<ExecStack>::const_iterator end = _engine->_gamestate->_executionStack.end();
+
+	debugPrintf("ExecStack(active): sp=ST:%04x", (unsigned)(s->xs->sp - s->stack_base));
+	debugPrintf(", fp=ST:%04x", (unsigned)(s->xs->fp - s->stack_base));
+	debugPrintf("\n");
+	debugPrintf("------------------\n");
+
+	uint i = 0;
+	for (it = _engine->_gamestate->_executionStack.begin(); it != end; ++it) {
+		const ExecStack &call = *it;
+		debugPrintf("ExecStack(%d): sp=ST:%04x", i, (unsigned)(call.sp - s->stack_base));
+		debugPrintf(", fp=ST:%04x", (unsigned)(call.fp - s->stack_base));
+		debugPrintf("\n");
+
+		i++;
+	}
+
+	return true;
+}
+
+bool Console::cmdKernCall(int argc, const char **argv) {
+	const size_t MAX_ARGS_ALLOWED = 20;
+	
+	if (argc <= 2) {
+		debugPrintf("Calls a kernel function by name.\n");
+		debugPrintf("(You must ensure you invoke the kernel function with the correct signature.)\n");
+		debugPrintf("Usage: %s <kernel-func-name> <param1> <param2> ... <paramn>\n", argv[0]);
+		debugPrintf("Example 1: %s Random 3 7\n", argv[0]);
+		debugPrintf("Example 2: %s Memory 6 002a:0012 0x6566\n", argv[0]);
+		return true;
+	}
+
+	const int kern_argc = argc - 2;
+
+	if (kern_argc > MAX_ARGS_ALLOWED) {
+		debugPrintf("No more than %d args allowed for a kernel call, you gave: %d.\n", (int)max_args_allowed, kern_argc);
+		return true;
+	}
+
+	Kernel *kernel = _engine->getKernel();
+
+	// Identify kernel call code by name.
+	int kernIdx = kernel->findKernelFuncPos(argv[1]);
+	if (kernIdx == -1) {
+		debugPrintf("No kernel function with name - see command \"kernfunctions\" for a list: %s\n", argv[1]);
+		return true;
+	}
+
+	const KernelFunction &kernelCall = kernel->_kernelFuncs[kernIdx];
+	
+	reg_t kernArgArr[MAX_ARGS_ALLOWED];
+
+	for (int i = 0; i < kern_argc; i++) {
+		reg_t kArg;
+		if (parse_reg_t(_engine->_gamestate, argv[2+i], &kArg)) {
+			debugPrintf("Invalid address \"%s\" passed.\n", argv[2+i]);
+			debugPrintf("Check the \"addresses\" command on how to use addresses\n");
+			return true;
+		}
+		kernArgArr[i] = kArg;
+	}
+
+	reg_t kernResult;
+
+	if (!kernelCall.subFunctionCount) {
+		// Must be a regular kernel function.
+		kernResult = kernelCall.function(_engine->_gamestate, kern_argc, kernArgArr);
+	} else {
+		// Must be a kernel function that supports sub commands.
+
+		// TODO: right now i'm hardcoding 6 for Memory PEEK but I noticed that I think I need to pull out the args in the array.
+		const KernelSubFunction &kernelSubCall = kernelCall.subFunctions[6];
+		if (!kernelSubCall.function) {
+			debugPrintf("Kernel sub function with id:%d does not exist\n", 0);
+			return true;
+		}
+		kernResult = kernelSubCall.function(_engine->_gamestate, kern_argc-1, kernArgArr);
+	}	
+
+	debugPrintf("kernel call result is: %04x:%04x\n", PRINT_REG(kernResult));
 
 	return true;
 }
@@ -3487,8 +3582,8 @@ void Console::printOffsets(int scriptNr, uint16 showType) {
 			continue;
 
 		curScriptObj = (Script *)curSegmentObj;
-		debugPrintf("=== SCRIPT %d inside Segment %d ===\n", curScriptObj->getScriptNumber(), curSegmentNr);
-		debugN("=== SCRIPT %d inside Segment %d ===\n", curScriptObj->getScriptNumber(), curSegmentNr);
+		debugPrintf("=== SCRIPT %d inside Segment %04x (%dd) ===\n", curScriptObj->getScriptNumber(), curSegmentNr, curSegmentNr);
+		debugN("=== SCRIPT %d inside Segment %04x (%dd) ===\n", curScriptObj->getScriptNumber(), curSegmentNr, curSegmentNr);
 
 		// now print the list
 		scriptOffsetLookupArray = curScriptObj->getOffsetArray();
