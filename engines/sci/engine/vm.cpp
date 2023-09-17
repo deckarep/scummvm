@@ -312,7 +312,7 @@ static void addKernelCallToExecStack(EngineState *s, int kernelCallNr, int kerne
 	s->_executionStack.push_back(xstack);
 }
 
-static void callKernelFunc(EngineState *s, int kernelCallNr, int argc) {
+void callKernelFunc(EngineState *s, int kernelCallNr, int argc) {
 	Kernel *kernel = g_sci->getKernel();
 
 	if (kernelCallNr >= (int)kernel->_kernelFuncs.size())

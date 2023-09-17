@@ -316,6 +316,7 @@ void GfxPalette::set(Palette *newPalette, bool force, bool forceRealMerge, bool 
 		// SCI1.1+ doesn't do real merging anymore, but simply copying over the used colors from other palettes
 		//  There are some games with inbetween SCI1.1 interpreters, use real merging for them (e.g. laura bow 2 demo)
 		if (forceRealMerge || _useMerging) {
+			warning("Doing merging of palette...");
 			_sysPaletteChanged |= merge(newPalette, force, forceRealMerge);
 		} else {
 			// SCI 1.1 has several functions which write to the system palette but
@@ -397,6 +398,7 @@ bool GfxPalette::merge(Palette *newPalette, bool force, bool forceRealMerge) {
 		if ((_sysPalette.colors[i].r == newPalette->colors[i].r) &&
 			(_sysPalette.colors[i].g == newPalette->colors[i].g) &&
 			(_sysPalette.colors[i].b == newPalette->colors[i].b)) {
+			warning("same color found - just remap: rgb(%d, %d, %d)", newPalette->colors[i].r, newPalette->colors[i].g, newPalette->colors[i].b);
 			newPalette->mapping[i] = i;
 			continue;
 		}
@@ -418,6 +420,7 @@ bool GfxPalette::merge(Palette *newPalette, bool force, bool forceRealMerge) {
 				_sysPalette.colors[j].g = newPalette->colors[i].g;
 				_sysPalette.colors[j].b = newPalette->colors[i].b;
 				newPalette->mapping[i] = j;
+				warning("Unused color was used...");
 				paletteChanged = true;
 				break;
 			}
@@ -454,6 +457,10 @@ uint16 GfxPalette::matchColor(byte matchRed, byte matchGreen, byte matchBlue, bo
 	int16 differenceTotal = 0;
 	int16 bestDifference = 0x7FFF;
 	uint16 bestColorNr = 255;
+	
+	byte bestRed;
+	byte bestGreen;
+	byte bestBlue;
 
 	if (_use16bitColorMatch || force16BitColorMatch) {
 		// used by SCI0 to SCI1, also by the first few SCI1.1 games
@@ -467,6 +474,10 @@ uint16 GfxPalette::matchColor(byte matchRed, byte matchGreen, byte matchBlue, bo
 			if (differenceTotal <= bestDifference) {
 				bestDifference = differenceTotal;
 				bestColorNr = colorNr;
+				
+				bestRed = _sysPalette.colors[colorNr].r;
+				bestGreen = _sysPalette.colors[colorNr].g;
+				bestBlue = _sysPalette.colors[colorNr].b;
 			}
 		}
 	} else {
@@ -476,18 +487,24 @@ uint16 GfxPalette::matchColor(byte matchRed, byte matchGreen, byte matchBlue, bo
 		for (colorNr = 0; colorNr < 256; colorNr++) {
 			if ((!_sysPalette.colors[colorNr].used))
 				continue;
-			differenceRed = (uint8)ABS<int8>(_sysPalette.colors[colorNr].r - matchRed);
-			differenceGreen = (uint8)ABS<int8>(_sysPalette.colors[colorNr].g - matchGreen);
-			differenceBlue = (uint8)ABS<int8>(_sysPalette.colors[colorNr].b - matchBlue);
+			differenceRed = (uint8)ABS(_sysPalette.colors[colorNr].r - matchRed);
+			differenceGreen = (uint8)ABS(_sysPalette.colors[colorNr].g - matchGreen);
+			differenceBlue = (uint8)ABS(_sysPalette.colors[colorNr].b - matchBlue);
 			differenceTotal = differenceRed + differenceGreen + differenceBlue;
 			if (differenceTotal <= bestDifference) {
 				bestDifference = differenceTotal;
 				bestColorNr = colorNr;
+
+				bestRed = _sysPalette.colors[colorNr].r;
+				bestGreen = _sysPalette.colors[colorNr].g;
+				bestBlue = _sysPalette.colors[colorNr].b;
 			}
 		}
 	}
 	if (differenceTotal == 0) // original interpreter does not do this, instead it does 2 calls for merges in the worst case
 		return bestColorNr | SCI_PALETTE_MATCH_PERFECT; // we set this flag, so that we can optimize during palette merge
+	
+	warning("og RGB(%d, %d, %d)   -> approxRGB(%d, %d, %d)", matchRed, matchGreen, matchBlue, bestRed, bestGreen, bestBlue);
 	return bestColorNr;
 }
 
