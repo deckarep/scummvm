@@ -63,7 +63,6 @@
 
 #include "common/file.h"
 #include "common/savefile.h"
-#include "common/stack.h"
 
 #include "engines/util.h"
 
