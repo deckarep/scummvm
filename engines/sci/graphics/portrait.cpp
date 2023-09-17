@@ -129,7 +129,6 @@ void Portrait::init() {
 		if (bytesPerLine < curBitmap.width)
 			error("kPortrait: bytesPerLine larger than actual width");
 		curBitmap.extraBytesPerLine = bytesPerLine - curBitmap.width;
-		warning("width: %d, bytesPerLine: %d, extraBytesPerLine: %d", curBitmap.width, bytesPerLine, curBitmap.extraBytesPerLine);
 		curBitmap.rawBitmap = data.subspan(14, curBitmap.width * curBitmap.height);
 		data += 14 + (curBitmap.height * bytesPerLine);
 	}
@@ -197,7 +196,6 @@ void Portrait::init() {
 
 void Portrait::doit(Common::Point position, uint16 resourceId, uint16 noun, uint16 verb, uint16 cond, uint16 seq) {
 	_position = position;
-	warning("Portrait::doit for resource: %d", resourceId);
 
 	// Now init audio and sync resource
 	uint32 audioNumber = ((noun & 0xff) << 24) | ((verb & 0xff) << 16) | ((cond & 0xff) << 8) | (seq & 0xff);
@@ -498,8 +496,6 @@ void Portrait::drawBitmap(uint16 bitmapNr) {
 
 	bitmapPosition.x += _bitmaps[bitmapNr].displaceX;
 	bitmapPosition.y += _bitmaps[bitmapNr].displaceY;
-
-	warning("displacements for bitmapNr: %d, x: %d, y: %d", bitmapNr, _bitmaps[bitmapNr].displaceX, _bitmaps[bitmapNr].displaceY);
 
 	const byte *data = _bitmaps[bitmapNr].rawBitmap.getUnsafeDataAt(0, bitmapWidth * bitmapHeight);
 	for (int y = 0; y < bitmapHeight; y++) {
