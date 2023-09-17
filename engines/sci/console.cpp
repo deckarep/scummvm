@@ -262,7 +262,6 @@ Console::Console(SciEngine *engine) : GUI::Debugger(),
 	registerCmd("vo",					WRAP_METHOD(Console, cmdViewObject));				// alias
 	registerCmd("active_object",		WRAP_METHOD(Console, cmdViewActiveObject));
 	registerCmd("acc_object",			WRAP_METHOD(Console, cmdViewAccumulatorObject));
-	registerCmd("xs",					WRAP_METHOD(Console, cmdXs));
 
 	_debugState.seeking = kDebugSeekNothing;
 	_debugState.seekLevel = 0;
@@ -647,30 +646,6 @@ bool Console::cmdKernelFunctions(int argc, const char **argv) {
 	}
 
 	debugPrintf("\n");
-
-	return true;
-}
-
-bool Console::cmdXs(int argc, const char **argv) {
-	EngineState *s = _engine->_gamestate;
-
-	Common::List<ExecStack>::const_iterator it;
-	const Common::List<ExecStack>::const_iterator end = _engine->_gamestate->_executionStack.end();
-
-	debugPrintf("ExecStack(active): sp=ST:%04x", (unsigned)(s->xs->sp - s->stack_base));
-	debugPrintf(", fp=ST:%04x", (unsigned)(s->xs->fp - s->stack_base));
-	debugPrintf("\n");
-	debugPrintf("------------------\n");
-
-	uint i = 0;
-	for (it = _engine->_gamestate->_executionStack.begin(); it != end; ++it) {
-		const ExecStack &call = *it;
-		debugPrintf("ExecStack(%d): sp=ST:%04x", i, (unsigned)(call.sp - s->stack_base));
-		debugPrintf(", fp=ST:%04x", (unsigned)(call.fp - s->stack_base));
-		debugPrintf("\n");
-
-		i++;
-	}
 
 	return true;
 }

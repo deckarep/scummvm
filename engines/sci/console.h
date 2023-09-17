@@ -177,7 +177,6 @@ private:
 	bool cmdViewObject(int argc, const char **argv);
 	bool cmdViewActiveObject(int argc, const char **argv);
 	bool cmdViewAccumulatorObject(int argc, const char **argv);
-	bool cmdXs(int argc, const char **argv);
 	// Variables
 	bool cmdSpeedThrottle(int argc, const char **argv);
 
