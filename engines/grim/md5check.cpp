@@ -21,12 +21,15 @@
 
 #include "common/file.h"
 #include "common/md5.h"
+#include "common/system.h"
 #include "common/translation.h"
 
+#include "gui/message.h"
 #include "gui/error.h"
 
 #include "engines/grim/md5check.h"
 #include "engines/grim/grim.h"
+
 
 namespace Grim {
 
@@ -417,6 +420,7 @@ const char *emi_installer[] = {
 	"a42f8aa079a6d23c285fceba191e67a4", // English (Monkey Island 4 Installer)
 };
 
+bool MD5Check::_userCanceled = false;
 bool MD5Check::_initted = false;
 Common::Array<MD5Check::MD5Sum> *MD5Check::_files = nullptr;
 int MD5Check::_iterator = -1;
@@ -425,6 +429,8 @@ void MD5Check::init() {
 	if (_initted) {
 		return;
 	}
+
+	_userCanceled = false;
 	_initted = true;
 	_files = new Common::Array<MD5Sum>();
 
@@ -462,27 +468,31 @@ void MD5Check::init() {
 			MD5SUM("grimdemo.mus", grimdemo)
 		} else {
 			MD5SUM("gfupd101.exe", gfupd101)
-			MD5SUM("year4mus.lab", year4mus)
-			MD5SUM("year3mus.lab", year3mus)
-			MD5SUM("year2mus.lab", year2mus)
-			MD5SUM("year1mus.lab", year1mus)
-			MD5SUM("year0mus.lab", year0mus)
-			MD5SUM("vox0004.lab", vox0004)
-			MD5SUM("vox0003.lab", vox0003)
-			MD5SUM("vox0002.lab", vox0002)
-			MD5SUM("vox0001.lab", vox0001)
-			MD5SUM("vox0000.lab", vox0000)
-			MD5SUM("movie04.lab", movie04)
-			MD5SUM("movie03.lab", movie03)
-			MD5SUM("movie02.lab", movie02)
-			MD5SUM("movie01.lab", movie01)
-			MD5SUM("movie00.lab", movie00)
-			MD5SUM("data004.lab", data004)
-			MD5SUM("data003.lab", data003)
-			MD5SUM("data002.lab", data002)
-			MD5SUM("data001.lab", data001)
-			MD5SUM("data000.lab", data000)
-			MD5SUM("credits.lab", credits)
+			MD5SUM("gfupd101.exe", gfupd101)
+			MD5SUM("gfupd101.exe", gfupd101)
+			MD5SUM("gfupd101.exe", gfupd101)
+			MD5SUM("gfupd101.exe", gfupd101)
+			// MD5SUM("year4mus.lab", year4mus)
+			// MD5SUM("year3mus.lab", year3mus)
+			// MD5SUM("year2mus.lab", year2mus)
+			// MD5SUM("year1mus.lab", year1mus)
+			// MD5SUM("year0mus.lab", year0mus)
+			// MD5SUM("vox0004.lab", vox0004)
+			// MD5SUM("vox0003.lab", vox0003)
+			// MD5SUM("vox0002.lab", vox0002)
+			// MD5SUM("vox0001.lab", vox0001)
+			// MD5SUM("vox0000.lab", vox0000)
+			// MD5SUM("movie04.lab", movie04)
+			// MD5SUM("movie03.lab", movie03)
+			// MD5SUM("movie02.lab", movie02)
+			// MD5SUM("movie01.lab", movie01)
+			// MD5SUM("movie00.lab", movie00)
+			// MD5SUM("data004.lab", data004)
+			// MD5SUM("data003.lab", data003)
+			// MD5SUM("data002.lab", data002)
+			// MD5SUM("data001.lab", data001)
+			// MD5SUM("data000.lab", data000)
+			// MD5SUM("credits.lab", credits)
 			if (g_grim->getGameLanguage() != Common::EN_ANY && g_grim->getGameLanguage() != Common::ZH_CHN && g_grim->getGameLanguage() != Common::RU_RUS) {
 				MD5SUM("local.lab", local)
 			}
@@ -572,6 +582,10 @@ bool MD5Check::checkFiles() {
 	return ok;
 }
 
+bool MD5Check::userCanceled() {
+	return _userCanceled;
+}
+
 void MD5Check::startCheckFiles() {
 	init();
 	_iterator = 0;
@@ -596,11 +610,19 @@ bool MD5Check::advanceCheck(int *pos, int *total) {
 	Common::File file;
 	if (file.open(sum.filename)) {
 		Common::String md5 = Common::computeStreamMD5AsString(file);
+		g_system->delayMillis(2000);
 		if (!checkMD5(sum, md5.c_str())) {
 			warning("'%s' may be corrupted. MD5: '%s'", sum.filename, md5.c_str());
-			GUI::displayErrorDialog(Common::U32String::format(_("The game data file %s may be corrupted.\nIf you are sure it is "
+			auto noticeMsg = Common::U32String::format(_("The game data file %s may be corrupted.\nIf you are sure it is "
 									"not please provide the ScummVM team the following code, along with the file name, the language and a "
-									"description of your game version (i.e. dvd-box or jewelcase):\n%s"), sum.filename, md5.c_str()));
+									"description of your game version (i.e. dvd-box or jewelcase):\n%s"), sum.filename, md5.c_str());
+			auto alert = GUI::MessageDialog(noticeMsg, _("Continue"), _("Stop"));
+			if (alert.runModal() == GUI::kMessageAlt) {
+				// The user requested to stop processing md5 checksums so this will bail early.
+				_userCanceled = true;
+				return false;
+			}
+
 			return false;
 		}
 	} else {
